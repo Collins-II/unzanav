@@ -654,5 +654,6 @@ button:disabled { cursor: not-allowed; opacity: .65; }
 .content-grid.even { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: start; }
 .panel-list a strong, .panel-list a small { overflow-wrap: anywhere; }
 @media (max-width: 1020px) { .content-grid.even { grid-template-columns: 1fr; } }
-.chat-frame { height: calc(100dvh - 68px - 54px - 47px); min-height: 520px; }
-@media (max-width: 860px) { .chat-frame { height: calc(100dvh - 68px - 40px - 47px); min-height: 460px; } }
+.chat-frame { height: calc(100dvh - 68px - 54px); min-height: 0; }
+@media (max-width: 1200px) { .chat-frame { height: calc(100dvh - 68px - 52px); } }
+@media (max-width: 860px) { .chat-frame { height: calc(100dvh - 60px - 40px); } }

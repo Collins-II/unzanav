@@ -40,23 +40,31 @@ function NewChatModal({ userId, onClose, onCreated }: { userId?: string; onClose
   const [name, setName] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const dialogRef = useRef<HTMLDialogElement>(null);
   const shown = results.filter((p) => p.id !== userId);
 
   useEffect(() => {
+    dialogRef.current?.showModal();
+  }, []);
+
+  useEffect(() => {
+    const controller = new AbortController();
     const handle = setTimeout(async () => {
       const term = query.trim();
       try {
-        const res = await fetch(`/api/chat/users?q=${encodeURIComponent(term)}`);
+        const res = await fetch(`/api/chat/users?q=${encodeURIComponent(term)}`, { signal: controller.signal });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || "Unable to search students right now.");
+        if (controller.signal.aborted) return;
         setError("");
         setResults(data.users ?? []);
       } catch (searchError) {
+        if (controller.signal.aborted) return;
         setResults([]);
         setError(searchError instanceof Error ? searchError.message : "Unable to search students right now.");
       }
     }, 150);
-    return () => clearTimeout(handle);
+    return () => { clearTimeout(handle); controller.abort(); };
   }, [query]);
 
   const toggle = (p: Person) =>
@@ -84,11 +92,14 @@ function NewChatModal({ userId, onClose, onCreated }: { userId?: string; onClose
   const isGroup = selected.length > 1;
 
   return (
-    <div className="ui-modal-backdrop" onClick={onClose}>
-      <div className="ui-modal" role="dialog" aria-modal="true" aria-label="New chat" onClick={(e) => e.stopPropagation()}>
-        <div className="ui-modal-head">
+    <dialog ref={dialogRef} onCancel={(event) => { event.preventDefault(); if (!busy) onClose(); }} onClick={(event) => {
+      if (busy || event.target !== event.currentTarget) return;
+      const bounds = event.currentTarget.getBoundingClientRect();
+      if (event.clientX < bounds.left || event.clientX > bounds.right || event.clientY < bounds.top || event.clientY > bounds.bottom) onClose();
+    }} aria-label="New chat" className="m-auto max-h-[calc(100dvh-2rem)] w-[calc(100%_-_2rem)] max-w-lg overflow-y-auto rounded-2xl border-0 bg-white p-0 text-slate-900 shadow-2xl backdrop:bg-slate-950/50">
+        <div className="flex items-center justify-between gap-3 border-b border-slate-100 px-4 py-3">
           <h2 className="text-lg font-semibold tracking-tight">Find your people</h2>
-          <button type="button" onClick={onClose} aria-label="Close" className="flex h-11 w-11 items-center justify-center">
+          <button type="button" disabled={busy} onClick={onClose} aria-label="Close" className="flex h-11 w-11 items-center justify-center disabled:opacity-50">
             <X className="h-5 w-5" />
           </button>
         </div>
@@ -159,8 +170,8 @@ function NewChatModal({ userId, onClose, onCreated }: { userId?: string; onClose
           )}
           {error && <p className="text-sm font-semibold text-red-600">{error}</p>}
         </div>
-        <div className="ui-modal-actions">
-          <button type="button" className="ui-btn ui-btn-secondary" onClick={onClose}>
+        <div className="flex flex-wrap justify-end gap-2 border-t border-slate-100 p-4">
+          <button type="button" disabled={busy} className="ui-btn ui-btn-secondary" onClick={onClose}>
             Cancel
           </button>
           <button
@@ -172,8 +183,7 @@ function NewChatModal({ userId, onClose, onCreated }: { userId?: string; onClose
             {busy ? "Starting…" : isGroup ? "Create study circle" : "Start chat"}
           </button>
         </div>
-      </div>
-    </div>
+    </dialog>
   );
 }
 
@@ -188,7 +198,8 @@ function Thread({ conversation, userId, onBack, onActivity }: {
   const [error, setError] = useState("");
   const [text, setText] = useState("");
   const [tab, setTab] = useState<"messages" | "circle">("messages");
-  const endRef = useRef<HTMLDivElement>(null);
+  const messageListRef = useRef<HTMLDivElement>(null);
+  const followMessages = useRef(true);
   const nameById = useMemo(() => new Map(conversation.members.map((m) => [m.id, m.name])), [conversation.members]);
   const convId = conversation.id;
 
@@ -238,7 +249,8 @@ function Thread({ conversation, userId, onBack, onActivity }: {
   }, [loading, messages, convId, lastServerTime, onActivity]);
 
   useEffect(() => {
-    endRef.current?.scrollIntoView({ block: "end" });
+    const list = messageListRef.current;
+    if (list && followMessages.current) list.scrollTop = list.scrollHeight;
   }, [messages.length, loading]);
 
   const send = async (body: string, tempId?: string) => {
@@ -272,6 +284,7 @@ function Thread({ conversation, userId, onBack, onActivity }: {
     const body = text.trim();
     if (!body) return;
     setText("");
+    followMessages.current = true;
     void send(body);
   };
 
@@ -293,7 +306,7 @@ function Thread({ conversation, userId, onBack, onActivity }: {
       </header>
 
       {isGroup && (
-        <nav className="flex shrink-0 gap-1 border-b border-slate-200 bg-white px-3 py-2" aria-label="Study circle views">
+        <nav className="flex shrink-0 gap-1 overflow-x-auto border-b border-slate-200 bg-white px-3 py-2" aria-label="Study circle views">
           <button type="button" aria-pressed={tab === "messages"} onClick={() => setTab("messages")} className={`flex min-h-11 items-center gap-2 rounded-xl px-4 text-sm font-semibold ${tab === "messages" ? "bg-emerald-50 text-emerald-800" : "text-slate-500 hover:bg-slate-50"}`}><MessageSquare className="h-4 w-4" /> Conversation</button>
           <button type="button" aria-pressed={tab === "circle"} onClick={() => setTab("circle")} className={`flex min-h-11 items-center gap-2 rounded-xl px-4 text-sm font-semibold ${tab === "circle" ? "bg-emerald-50 text-emerald-800" : "text-slate-500 hover:bg-slate-50"}`}><LayoutGrid className="h-4 w-4" /> Circle board</button>
         </nav>
@@ -302,7 +315,10 @@ function Thread({ conversation, userId, onBack, onActivity }: {
         <StudyCircle conversationId={convId} userId={userId} ownerId={conversation.createdBy} memberNames={nameById} />
       ) : (
       <>
-      <div className="min-h-0 flex-1 space-y-2 overflow-y-auto bg-slate-50 px-3 py-4 sm:px-5">
+      <div ref={messageListRef} onScroll={(event) => {
+        const list = event.currentTarget;
+        followMessages.current = list.scrollHeight - list.scrollTop - list.clientHeight < 80;
+      }} className="min-h-0 flex-1 space-y-2 overflow-y-auto overscroll-contain bg-slate-50 px-3 py-4 sm:px-5">
         {loading && (
           <div className="flex justify-center py-10 text-[#008236]">
             <Loader2 className="h-6 w-6 animate-spin" />
@@ -339,7 +355,6 @@ function Thread({ conversation, userId, onBack, onActivity }: {
             </div>
           );
         })}
-        <div ref={endRef} />
       </div>
 
       <form onSubmit={submit} className="flex items-end gap-2 border-t border-slate-200 bg-white p-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))]">

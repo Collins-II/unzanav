@@ -6,7 +6,7 @@ import CircleActivity from "@/lib/database/models/CircleActivity";
 export const dynamic = "force-dynamic";
 type Context = { params: Promise<{ id: string; activityId: string }> };
 
-export const GET = withDatabaseErrorHandling(async function GET(_request: Request, { params }: Context) {
+export const GET = withDatabaseErrorHandling(async function GET(request: Request, { params }: Context) {
   const { id, activityId } = await params;
   const userId = await getChatUserId();
   if (!userId) return NextResponse.json({ error: "Authentication required." }, { status: 401 });
@@ -21,11 +21,12 @@ export const GET = withDatabaseErrorHandling(async function GET(_request: Reques
     return NextResponse.json({ error: "Document not found or it has been removed." }, { status: 404 });
   }
   const filename = encodeURIComponent(activity.document.name).replace(/['()*]/g, (char) => `%${char.charCodeAt(0).toString(16).toUpperCase()}`);
+  const inline = new URL(request.url).searchParams.get("view") === "1" && activity.document.contentType === "application/pdf";
   return new Response(new Uint8Array(activity.documentData), {
     headers: {
       "Content-Type": activity.document.contentType,
       "Content-Length": String(activity.documentData.length),
-      "Content-Disposition": `attachment; filename="study-resource.${activity.document.contentType === "application/pdf" ? "pdf" : "docx"}"; filename*=UTF-8''${filename}`,
+      "Content-Disposition": `${inline ? "inline" : "attachment"}; filename="study-resource.${activity.document.contentType === "application/pdf" ? "pdf" : "docx"}"; filename*=UTF-8''${filename}`,
       "Cache-Control": "private, no-store",
       "X-Content-Type-Options": "nosniff",
       "Content-Security-Policy": "sandbox",

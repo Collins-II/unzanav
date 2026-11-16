@@ -35,7 +35,7 @@ export function CampusNavbar() {
 
   return (
     <div
-      className="pointer-events-auto relative flex min-w-0 items-center justify-between gap-3"
+      className="pointer-events-auto relative flex min-w-0 items-center justify-between gap-3 max-[359px]:gap-2"
       onKeyDown={(event) => {
         if (event.key === 'Escape' && menuOpen) {
           setMenuOpen(false);
@@ -46,11 +46,11 @@ export function CampusNavbar() {
       <Link
         href="/"
         aria-label="UNZA Navigator home"
-        className="shrink-0 rounded-xl border border-emerald-100 bg-white/95 p-2.5 shadow-lg shadow-black/10 backdrop-blur-md"
+        className="shrink-0 border-b-[5px] border-emerald-700 bg-transparent py-0 pl-1.5 pr-4 shadow-lg shadow-black/30 backdrop-blur-md focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-emerald-600 max-[359px]:pr-2"
       >
-        <BrandLogo className="gap-2 [&>span:first-child]:h-9 [&>span:first-child]:w-9 [&>span:last-child>span:first-child]:text-sm [&>span:last-child>span:last-child]:text-[8px]" />
+        <BrandLogo />
       </Link>
-      <div className="flex min-w-0 flex-wrap items-center gap-2">
+      <div className="flex min-w-0 flex-nowrap items-center gap-2 max-[359px]:gap-1">
         <nav aria-label="Campus navigation" className="hidden items-center gap-1 rounded-full bg-white p-1 shadow-lg shadow-black/10 xl:flex">
           {links.map(({ href, label }) => (
             <Link key={href} href={href} aria-current={pathname === href ? 'page' : undefined} className={`rounded-full px-4 py-2 text-sm font-medium text-slate-900 transition-colors focus-visible:outline-2 focus-visible:outline-emerald-600 ${pathname === href ? 'bg-emerald-50 text-emerald-800' : 'hover:bg-gray-100'}`}>
@@ -64,7 +64,7 @@ export function CampusNavbar() {
             <LogOut aria-hidden="true" className="h-4 w-4" /> Log out
           </button>
         ) : status === 'unauthenticated' && pathname !== '/login' ? (
-          <Link href="/login" className="flex h-11 items-center gap-2 rounded-full bg-emerald-600 px-5 text-sm font-semibold text-white shadow-lg shadow-emerald-900/15 transition-colors hover:bg-emerald-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600">
+          <Link href="/login" className="flex h-11 items-center gap-2 rounded-full bg-emerald-600 px-5 text-sm font-semibold text-white shadow-lg shadow-emerald-900/15 transition-colors hover:bg-emerald-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600 max-[359px]:gap-1.5 max-[359px]:px-2.5 max-[359px]:text-xs">
             <LogIn aria-hidden="true" className="h-4 w-4" /> Log in
           </Link>
         ) : null}
@@ -75,7 +75,7 @@ export function CampusNavbar() {
           aria-expanded={menuOpen}
           aria-controls="home-navigation"
           onClick={() => setMenuOpen((open) => !open)}
-          className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-white text-emerald-800 shadow-lg shadow-black/10 xl:hidden"
+          className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-white text-emerald-800 shadow-lg shadow-black/10 xl:hidden max-[359px]:h-10 max-[359px]:w-10"
         >
           {menuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
         </button>

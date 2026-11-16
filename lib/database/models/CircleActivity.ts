@@ -15,6 +15,7 @@ export interface ICircleActivity {
   createdAt: Date;
   document?: CircleDocument;
   documentData?: Buffer;
+  session?: mongoose.Types.ObjectId;
 }
 
 const circleActivitySchema = new Schema<ICircleActivity>(
@@ -38,12 +39,14 @@ const circleActivitySchema = new Schema<ICircleActivity>(
       default: undefined,
     },
     documentData: { type: Buffer, select: false },
+    session: { type: Schema.Types.ObjectId, ref: "CircleActivity" },
   },
   { timestamps: { createdAt: true, updatedAt: false } }
 );
 
 circleActivitySchema.index({ conversation: 1, _id: -1 });
 circleActivitySchema.index({ conversation: 1, kind: 1, _id: -1 });
+circleActivitySchema.index({ conversation: 1, session: 1, _id: -1 });
 
 const CircleActivity = (mongoose.models.CircleActivity as mongoose.Model<ICircleActivity> | undefined)
   || mongoose.model<ICircleActivity>("CircleActivity", circleActivitySchema);

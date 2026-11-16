@@ -37,6 +37,7 @@ export type CircleActivity = CircleDraft & {
   createdAt: string;
   responses: Record<string, string>;
   document?: CircleDocument;
+  sessionId?: string;
 };
 
 export function validateCircleDraft(

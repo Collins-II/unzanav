@@ -41,6 +41,10 @@ The map supports Great East Road and Ridgeway campus switching, restricts pannin
 
 Outlines in `lib/campus-geography.ts` must stay synchronized with the portal's `lib/campus/geography.ts`. Sources are OpenStreetMap [relation 9374733](https://www.openstreetmap.org/relation/9374733) and [way 369606883](https://www.openstreetmap.org/way/369606883), retrieved 2026-11-05, copyright OpenStreetMap contributors under [ODbL](https://www.openstreetmap.org/copyright). They are navigation outlines, not cadastral surveys.
 
+## Study Circle resources
+
+Circle members can share links and PDF or DOCX files up to 4 MB on the resource shelf or attach them to a study session. The in-app PDF reader provides page and zoom controls; PDFs can also be downloaded, while DOCX files are downloaded. Resources remain on the shelf if their session is removed. Files are not virus-scanned, so only open material you trust and have permission to share.
+
 ## Validation and production launch
 
 Run before deployment:

@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState, type FormEvent } from "react"
 import { ArrowUpRight, BookOpen, CalendarDays, Check, CheckCheck, Download, ExternalLink, FileText, ListChecks, Loader2, MapPin, Plus, Trash2, Upload, Users, X } from "lucide-react";
 import { CIRCLE_DOCUMENT_ACCEPT, validateCircleDocument, validateCircleDraft, type CircleActivity, type CircleKind } from "@/lib/study-circles";
 import { MIN_CIRCLE_BOOKING_MEMBERS } from "@/lib/booking-policy";
+import { PdfReader } from "@/components/chat/PdfReader";
 
 type ActivityPage = { activities: CircleActivity[]; nextCursor: string | null };
 type Props = { conversationId: string; userId: string; ownerId?: string; memberNames: Map<string, string> };
@@ -25,13 +26,14 @@ async function requestData<T>(url: string, init?: RequestInit): Promise<T> {
   return data;
 }
 
-async function loadActivities(endpoint: string, pages: number, filter: "all" | CircleKind, signal?: AbortSignal) {
+async function loadActivities(endpoint: string, pages: number, filter: "all" | CircleKind, signal?: AbortSignal, sessionId?: string) {
   const activities: CircleActivity[] = [];
   let cursor: string | null = null;
   for (let page = 0; page < pages; page++) {
     const search = new URLSearchParams();
     if (cursor) search.set("before", cursor);
     if (filter !== "all") search.set("kind", filter);
+    if (sessionId) search.set("sessionId", sessionId);
     const result: ActivityPage = await requestData<ActivityPage>(`${endpoint}?${search}`, { signal, cache: "no-store" });
     activities.push(...result.activities);
     cursor = result.nextCursor;
@@ -50,6 +52,7 @@ export function StudyCircle({ conversationId, userId, ownerId, memberNames }: Pr
   const [now, setNow] = useState(() => Date.now());
   const [busy, setBusy] = useState(false);
   const [creating, setCreating] = useState<CircleKind | null>(null);
+  const [reading, setReading] = useState<CircleActivity | null>(null);
   const [filter, setFilter] = useState<"all" | CircleKind>("all");
   const requestVersion = useRef(0);
   const endpoint = `/api/chat/conversations/${conversationId}/circle`;
@@ -201,6 +204,7 @@ export function StudyCircle({ conversationId, userId, ownerId, memberNames }: Pr
                   <p className="text-[10px] font-semibold uppercase tracking-wider text-emerald-700">{labels[activity.kind]}</p>
                   <h4 className="mt-1 break-words text-lg font-semibold text-slate-900">{activity.title}</h4>
                   <p className="mt-1 text-xs text-slate-500">Shared by {memberNames.get(activity.createdBy) || "a circle member"}</p>
+                  {activity.sessionId && <p className="mt-1 text-xs text-emerald-700">Session resource</p>}
                 </div>
                 {(activity.createdBy === userId || ownerId === userId) && (
                   <button type="button" aria-label={`Remove ${activity.title}`} disabled={busy} onClick={() => {
@@ -223,6 +227,7 @@ export function StudyCircle({ conversationId, userId, ownerId, memberNames }: Pr
                     <Link href={`/navigation?destination=${encodeURIComponent(activity.location)}`} className={`${actionClass} text-emerald-800 hover:bg-emerald-50`}><MapPin className="h-4 w-4" /> Directions</Link>
                   </div>
                   <p className="text-xs text-slate-400">A meetup plan, not a room reservation. Check availability before meeting.</p>
+                  <SessionResources endpoint={endpoint} sessionId={activity.id} onRead={setReading} onDownload={download} busy={busy} />
                 </div>
               )}
               {activity.kind === "poll" && (
@@ -242,34 +247,103 @@ export function StudyCircle({ conversationId, userId, ownerId, memberNames }: Pr
                   <p className="text-xs text-slate-500">{votes.length} {votes.length === 1 ? "vote" : "votes"} · One vote per member. Tap another option to change yours.</p>
                 </div>
               )}
-              {activity.kind === "resource" && (activity.document ? (
-                <button type="button" disabled={busy} onClick={() => void download(activity)} className="mt-4 flex min-h-14 w-full items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3 text-left text-sm text-emerald-800 hover:border-emerald-300 disabled:opacity-50">
-                  <FileText className="h-5 w-5 shrink-0" />
-                  <span className="min-w-0 flex-1"><span className="block truncate font-semibold">{activity.document.name}</span><span className="mt-1 block text-xs text-slate-500">{activity.document.name.toLowerCase().endsWith(".pdf") ? "PDF" : "Word document"} · {(activity.document.size / (1024 * 1024)).toFixed(2)} MB · Download</span></span>
-                  <Download className="h-5 w-5 shrink-0" />
-                </button>
-              ) : (
-                <a href={activity.url} target="_blank" rel="noopener noreferrer" className="mt-4 flex min-h-12 items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-emerald-800 hover:border-emerald-300">
-                  <ExternalLink className="h-4 w-4 shrink-0" /><span className="min-w-0 flex-1 truncate">{activity.url}</span><ArrowUpRight className="h-4 w-4 shrink-0" />
-                </a>
-              ))}
+              {activity.kind === "resource" && <ResourceAttachment activity={activity} onRead={setReading} onDownload={download} busy={busy} />}
             </article>
           );
         })}
         {hasMore && <button type="button" disabled={loading || busy} onClick={() => { setLoading(true); setPages((count) => count + 1); }} className={`${actionClass} w-full border border-slate-200 bg-white text-slate-700 hover:bg-slate-100`}>Load older activities</button>}
       </div>
+      {reading?.document && <PdfReader key={reading.id} url={`${endpoint}/${reading.id}/document`} name={reading.document.name} onClose={() => setReading(null)} />}
     </div>
   );
 }
 
-function ActivityForm({ kind, endpoint, onClose, onSaved }: { kind: CircleKind; endpoint: string; onClose: () => void; onSaved: () => void }) {
+function ResourceAttachment({ activity, onRead, onDownload, busy }: { activity: CircleActivity; onRead: (activity: CircleActivity) => void; onDownload: (activity: CircleActivity) => Promise<void>; busy: boolean }) {
+  if (!activity.document) return (
+    <a href={activity.url} target="_blank" rel="noopener noreferrer" className="mt-4 flex min-h-12 items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-emerald-800 hover:border-emerald-300">
+      <ExternalLink className="h-4 w-4 shrink-0" /><span className="min-w-0 flex-1 truncate">{activity.url}</span><ArrowUpRight className="h-4 w-4 shrink-0" />
+    </a>
+  );
+  const isPdf = activity.document.contentType === "application/pdf";
+  return (
+    <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-3">
+      <div className="flex min-w-0 items-center gap-3 text-sm text-slate-700">
+        <FileText className="h-5 w-5 shrink-0 text-emerald-700" />
+        <span className="min-w-0"><span className="block truncate font-semibold">{activity.document.name}</span><span className="block text-xs text-slate-500">{isPdf ? "PDF" : "Word document"} · {(activity.document.size / (1024 * 1024)).toFixed(2)} MB</span></span>
+      </div>
+      <div className="mt-2 flex flex-wrap gap-2">
+        {isPdf && <button type="button" onClick={() => onRead(activity)} className={`${actionClass} bg-emerald-700 text-white hover:bg-emerald-800`}><BookOpen className="h-4 w-4" /> Read PDF</button>}
+        <button type="button" disabled={busy} onClick={() => void onDownload(activity)} className={`${actionClass} text-emerald-800 hover:bg-emerald-100`}><Download className="h-4 w-4" /> Download</button>
+      </div>
+      <p className="mt-1 text-xs text-slate-500">Files are not virus-scanned. Open only files you trust.</p>
+    </div>
+  );
+}
+
+function SessionResources({ endpoint, sessionId, onRead, onDownload, busy }: { endpoint: string; sessionId: string; onRead: (activity: CircleActivity) => void; onDownload: (activity: CircleActivity) => Promise<void>; busy: boolean }) {
+  const [open, setOpen] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [activities, setActivities] = useState<CircleActivity[]>([]);
+  const [pages, setPages] = useState(1);
+  const [hasMore, setHasMore] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [revision, setRevision] = useState(0);
+
+  useEffect(() => {
+    if (!open) return;
+    const controller = new AbortController();
+    let requestVersion = 0;
+    const load = () => {
+      const version = ++requestVersion;
+      void loadActivities(endpoint, pages, "resource", controller.signal, sessionId)
+        .then((result) => {
+          if (controller.signal.aborted || version !== requestVersion) return;
+          setActivities(result.activities);
+          setHasMore(result.hasMore);
+          setError("");
+        })
+        .catch((cause: unknown) => {
+          if (!controller.signal.aborted && version === requestVersion) setError(cause instanceof Error ? cause.message : "Unable to load session resources.");
+        })
+        .finally(() => { if (!controller.signal.aborted && version === requestVersion) setLoading(false); });
+    };
+    load();
+    const timer = setInterval(() => { if (!document.hidden) load(); }, 15000);
+    return () => { controller.abort(); clearInterval(timer); };
+  }, [open, endpoint, pages, sessionId, revision]);
+
+  return (
+    <div className="border-t border-slate-100 pt-3">
+      <button type="button" aria-expanded={open} onClick={() => { if (!open) setLoading(true); setOpen(!open); }} className={`${actionClass} bg-slate-100 text-slate-700 hover:bg-slate-200`}><BookOpen className="h-4 w-4" /> {open ? "Hide session resources" : "Session resources"}</button>
+      {open && <div className="mt-3 space-y-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <p className="text-xs text-slate-500">Manage or remove these resources on the circle&apos;s resource shelf.</p>
+          <button type="button" onClick={() => setCreating(true)} className={`${actionClass} text-emerald-800 hover:bg-emerald-50`}><Plus className="h-4 w-4" /> Add resource</button>
+        </div>
+        {creating && <ActivityForm kind="resource" endpoint={endpoint} sessionId={sessionId} onClose={() => setCreating(false)} onSaved={() => { setCreating(false); setLoading(true); setRevision((value) => value + 1); }} />}
+        {error && <div role="alert" className="text-sm text-amber-900">{error} <button type="button" onClick={() => { setLoading(true); setRevision((value) => value + 1); }} className="min-h-11 font-semibold underline">Retry</button></div>}
+        {loading ? <p role="status" className="text-sm text-slate-500">Loading resources...</p> : !error && !activities.length ? <p className="text-sm text-slate-500">No resources for this session yet.</p> : activities.map((resource) => (
+          <div key={resource.id} className="rounded-xl border border-slate-200 p-3">
+            <p className="break-words text-sm font-semibold text-slate-900">{resource.title}</p>
+            {resource.description && <p className="mt-1 whitespace-pre-wrap break-words text-sm text-slate-500">{resource.description}</p>}
+            <ResourceAttachment activity={resource} onRead={onRead} onDownload={onDownload} busy={busy} />
+          </div>
+        ))}
+        {hasMore && <button type="button" disabled={loading} onClick={() => { setLoading(true); setPages((value) => value + 1); }} className={`${actionClass} text-emerald-800`}>Load older resources</button>}
+      </div>}
+    </div>
+  );
+}
+
+function ActivityForm({ kind, endpoint, sessionId, onClose, onSaved }: { kind: CircleKind; endpoint: string; sessionId?: string; onClose: () => void; onSaved: () => void }) {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [startsAt, setStartsAt] = useState("");
   const [location, setLocation] = useState("");
   const [options, setOptions] = useState(["", ""]);
   const [url, setUrl] = useState("");
-  const [resourceMode, setResourceMode] = useState<"link" | "document">("link");
+  const [resourceMode, setResourceMode] = useState<"link" | "document">(sessionId ? "document" : "link");
   const [file, setFile] = useState<File | null>(null);
   const [places, setPlaces] = useState<string[]>([]);
   const [placesError, setPlacesError] = useState("");
@@ -316,9 +390,10 @@ function ActivityForm({ kind, endpoint, onClose, onSaved }: { kind: CircleKind; 
         form.set("title", result.data.title);
         form.set("description", result.data.description);
         form.set("file", file);
+        if (sessionId) form.set("sessionId", sessionId);
         await requestData(endpoint, { method: "POST", body: form });
       } else {
-        await requestData(endpoint, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(result.data) });
+        await requestData(endpoint, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...result.data, ...(sessionId ? { sessionId } : {}) }) });
       }
       onSaved();
     } catch (error) {
@@ -380,10 +455,10 @@ function ActivityForm({ kind, endpoint, onClose, onSaved }: { kind: CircleKind; 
                 }
                 setFile(selected);
               }} className={`${fieldClass} text-sm file:mr-3 file:rounded-lg file:border-0 file:bg-emerald-50 file:px-3 file:py-2 file:font-semibold file:text-emerald-800`} />
-              <span className="block text-xs font-normal text-slate-500">PDF or DOCX, up to 4 MB per document. Downloads are available only to circle members.</span>
+              <span className="block text-xs font-normal text-slate-500">PDF or DOCX, up to 4 MB per document. Circle members can read PDFs in their browser or download files.</span>
             </label>
           )}
-          <p className="text-xs text-slate-500">Only share material you have permission to share. Files are not virus-scanned; download only documents you trust.</p>
+          <p className="text-xs text-slate-500">Only share material you have permission to share. Files are not virus-scanned; open or download only documents you trust.</p>
         </div>
       )}
       {error && <p role="alert" className="rounded-xl bg-amber-50 p-3 text-sm text-amber-900">{error}</p>}

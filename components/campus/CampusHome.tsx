@@ -7,6 +7,7 @@ import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } f
 import {
   Building2,
   CalendarDays,
+  ChevronDown,
   Clock,
   Footprints,
   Locate,
@@ -86,7 +87,7 @@ export default function Home() {
   const [bookings, setBookings] = useState<DashboardBooking[]>([]);
   const [homeDataError, setHomeDataError] = useState('');
   const [bookingAccess, setBookingAccess] = useState<BookingAccess | null>(null);
-  const [snap, setSnap] = useState<'peek' | 'half' | 'full'>('half');
+  const [snap, setSnap] = useState<'peek' | 'half' | 'full'>('peek');
   const [reloadKey, setReloadKey] = useState(0);
   const listRef = useRef<HTMLDivElement>(null);
   const homeRequest = useRef(0);
@@ -283,23 +284,24 @@ export default function Home() {
         onRoute={setRouteInfo}
         userLocation={userLocation ?? undefined}
         campusId={campusId}
+        showCampusSelector={false}
         onCampusChange={(campus) => { setCampusChoice(campus); setSelectedId(null); setCategory('All'); setSearchQuery(''); setRouteInfo(null); }}
       />
 
       {/* Top bar */}
-      <header className="pointer-events-none absolute inset-x-0 top-0 z-[1000] p-4 md:p-6">
+      <header className={`pointer-events-none absolute inset-x-0 top-0 z-[1000] p-3 sm:p-4 md:p-6 max-[359px]:p-2.5 ${snap === 'full' ? 'max-xl:hidden' : ''}`}>
         <CampusNavbar />
       </header>
 
       {/* Bottom sheet (mobile) / side panel (desktop) */}
       <section
         aria-label="Campus places"
-        className={`absolute inset-x-0 bottom-[calc(68px+env(safe-area-inset-bottom))] z-[999] flex min-h-0 flex-col overflow-hidden rounded-t-3xl border-t-4 border-emerald-600 bg-white shadow-[0_-12px_40px_rgba(5,46,22,0.15)] transition-[height] duration-300 ease-out motion-reduce:transition-none xl:inset-x-auto xl:bottom-6 xl:left-6 xl:top-28 xl:h-auto xl:w-[420px] xl:rounded-2xl xl:shadow-2xl ${
+        className={`absolute inset-x-0 bottom-[calc(68px+env(safe-area-inset-bottom))] ${snap === 'full' ? 'z-[1100]' : 'z-[999]'} flex min-h-0 flex-col overflow-hidden rounded-t-[28px] border border-emerald-100 border-t-4 border-t-emerald-600 bg-white shadow-[0_-16px_50px_rgba(15,23,42,0.2)] transition-[height] duration-300 ease-out motion-reduce:transition-none xl:inset-x-auto xl:bottom-6 xl:left-6 xl:top-28 xl:h-auto xl:w-[420px] xl:rounded-2xl xl:shadow-2xl ${
           snap === 'peek'
-            ? 'h-auto max-h-[calc(100dvh-170px-env(safe-area-inset-bottom))]'
+            ? 'h-auto max-h-[calc(100dvh-148px-env(safe-area-inset-bottom))]'
             : snap === 'half'
-              ? 'h-[min(65dvh,calc(100dvh-170px-env(safe-area-inset-bottom)))]'
-              : 'h-[calc(100dvh-156px-env(safe-area-inset-bottom))]'
+              ? 'h-[min(65dvh,calc(100dvh-148px-env(safe-area-inset-bottom)))]'
+              : 'h-[calc(100dvh-68px-env(safe-area-inset-bottom))]'
         }`}
       >
         <div
@@ -320,24 +322,29 @@ export default function Home() {
             aria-label={snap === 'full' ? 'Collapse panel' : 'Expand panel'}
             aria-expanded={snap !== 'peek'}
             onClick={() => setSnap((s) => (s === 'peek' ? 'half' : s === 'half' ? 'full' : 'peek'))}
-            className="flex h-8 w-full touch-none items-center justify-center"
+            className="flex h-9 w-full touch-none items-center justify-center"
           >
             <span className="h-1.5 w-12 rounded-full bg-gray-300" />
           </button>
         </div>
 
-        <div className="max-h-[31%] shrink-0 overflow-y-auto overscroll-contain px-4 pb-2 pt-0 xl:max-h-[45%] xl:px-5 xl:pt-5">
-          <div className={snap === 'peek' ? 'hidden xl:block' : ''}>
-            <label className="text-[11px] font-bold text-[#008236]"><span className="sr-only">Campus places selection</span><select aria-label="Campus places selection" className="h-8 max-w-full bg-white" value={campusId} onChange={(event) => { setCampusChoice(event.target.value as CampusId); setSelectedId(null); setCategory('All'); setSearchQuery(''); setRouteInfo(null); }}>{campuses.map((campus) => <option key={campus.id} value={campus.id}>{campus.name}</option>)}</select></label>
-            <h1 className="mt-1 text-xl font-extrabold leading-tight tracking-tight xl:text-2xl">
-              {isAuthenticated ? `Hi ${firstName}, where to?` : 'Find your way at UNZA.'}
-            </h1>
-            <p className={`mt-1 text-xs leading-relaxed text-gray-500 ${snap !== 'full' ? 'hidden xl:block' : ''}`}>Your campus, connected. Find a place and get walking directions.</p>
-          </div>
+        <div className={`${snap === 'full' ? 'max-h-[34%]' : 'max-h-[42%]'} shrink-0 overflow-y-auto overscroll-contain px-4 pb-2 pt-0 xl:max-h-[45%] xl:px-5 xl:pt-5`}>
+          <div>
+          <label className="inline-flex h-8 max-w-full items-center gap-1.5 rounded-full border border-emerald-100 bg-emerald-50 px-3 text-[11px] font-bold text-emerald-800 shadow-sm">
+            <MapPin aria-hidden="true" className="h-3.5 w-3.5 shrink-0" />
+            <span className="sr-only">Campus places selection</span>
+            <select aria-label="Campus places selection" className="min-w-0 appearance-none bg-transparent outline-none" value={campusId} onChange={(event) => { setCampusChoice(event.target.value as CampusId); setSelectedId(null); setCategory('All'); setSearchQuery(''); setRouteInfo(null); }}>{campuses.map((campus) => <option key={campus.id} value={campus.id}>{campus.name}</option>)}</select>
+            <ChevronDown aria-hidden="true" className="h-3.5 w-3.5 shrink-0" />
+          </label>
+          <h1 className={`mt-2 text-xl font-extrabold leading-tight tracking-tight text-slate-950 xl:text-2xl ${snap === 'peek' ? 'hidden xl:block' : ''}`}>
+            {isAuthenticated ? `Hi ${firstName}, where to?` : 'Find your way at UNZA.'}
+          </h1>
+          <p className="mt-1 hidden text-xs leading-relaxed text-slate-500 xl:block">Your campus, connected. Find a place and get walking directions.</p>
+        </div>
 
-          <div className="mt-3 flex items-center gap-3 rounded-xl border border-gray-300 bg-gray-50 px-3 focus-within:border-emerald-600 focus-within:ring-2 focus-within:ring-emerald-100">
-            <Search className="h-5 w-5 shrink-0 text-gray-500" />
-            <input
+        <div className={`mt-3 items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-3 shadow-sm transition focus-within:border-emerald-500 focus-within:bg-white focus-within:ring-4 focus-within:ring-emerald-100 ${snap === 'peek' ? 'hidden xl:flex' : 'flex'}`}>
+          <Search className="h-5 w-5 shrink-0 text-emerald-700" />
+          <input
               type="search"
               inputMode="search"
               enterKeyHint="search"
@@ -346,7 +353,7 @@ export default function Home() {
               onFocus={() => setSnap((s) => (s === 'peek' ? 'half' : s))}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search buildings, labs, halls"
-              className="h-11 w-full bg-transparent text-base font-medium outline-none placeholder:text-gray-500 [&::-webkit-search-cancel-button]:hidden"
+              className="h-12 w-full bg-transparent text-base font-medium text-slate-900 outline-none placeholder:text-slate-400 [&::-webkit-search-cancel-button]:hidden"
             />
             {searchQuery && (
               <button
@@ -359,14 +366,14 @@ export default function Home() {
               </button>
             )}
           </div>
-          <div className={`mt-3 grid-cols-2 gap-2 ${snap !== 'full' ? 'hidden xl:grid' : 'grid'}`}>
-            <Link href="/bookings" className="flex min-h-10 items-center justify-center gap-2 rounded-lg border border-emerald-100 bg-emerald-50 px-3 text-xs font-semibold text-emerald-800 hover:bg-emerald-100">
+          <div className={`-mx-4 mt-3 gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none] xl:-mx-5 xl:px-5 ${snap !== 'full' ? 'hidden xl:grid xl:grid-cols-2' : 'flex xl:grid xl:grid-cols-2'}`}>
+            <Link href="/bookings" className="flex min-h-10 shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-lg border border-emerald-100 bg-emerald-50 px-3 text-xs font-semibold text-emerald-800 hover:bg-emerald-100">
               <Building2 className="h-4 w-4" /> Book a room
             </Link>
-            <Link href="/timetable" className="flex min-h-10 items-center justify-center gap-2 rounded-lg border border-gray-200 px-3 text-xs font-semibold text-gray-700 hover:bg-gray-50">
+            <Link href="/timetable" className="flex min-h-10 shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-lg border border-gray-200 px-3 text-xs font-semibold text-gray-700 hover:bg-gray-50">
               <CalendarDays className="h-4 w-4" /> My timetable
             </Link>
-            <Link href="/assessments" className="flex min-h-10 items-center justify-center gap-2 rounded-lg border border-gray-200 px-3 text-xs font-semibold text-gray-700 hover:bg-gray-50"><CalendarDays className="h-4 w-4" /> Quizzes, tests & exams</Link>
+            <Link href="/assessments" className="flex min-h-10 shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-lg border border-gray-200 px-3 text-xs font-semibold text-gray-700 hover:bg-gray-50"><CalendarDays className="h-4 w-4" /> Quizzes, tests &amp; exams</Link>
           </div>
 
           {bookingAccess?.allowed === false && (
@@ -403,19 +410,19 @@ export default function Home() {
           )}
         </div>
 
-        <p role="status" className={`shrink-0 px-4 py-2 text-[11px] font-semibold text-gray-500 xl:px-5 ${snap === 'peek' ? 'hidden xl:block' : ''}`}>
+        <p role="status" className={`shrink-0 px-4 py-2 text-[11px] font-semibold text-gray-500 xl:px-5 ${snap === 'peek' || snap === 'full' ? 'hidden xl:block' : ''}`}>
           {locationsState === 'loading' ? 'Loading campus places...' : locationsState === 'error' ? 'Campus places unavailable' : `${results.length} ${results.length === 1 ? 'place' : 'places'}${searchQuery || category !== 'All' ? ' found' : ' to explore'}`}
         </p>
         <div
           ref={listRef}
           tabIndex={0}
           aria-label="Scrollable campus locations"
-          className={`min-h-0 flex-1 overflow-y-auto overscroll-contain border-t border-gray-100 px-2 [-webkit-overflow-scrolling:touch] ${snap === 'peek' ? 'hidden xl:block' : ''}`}
+          className={`min-h-0 flex-1 overflow-y-auto overscroll-contain border-t border-slate-100 px-2 py-1 [-webkit-overflow-scrolling:touch] ${snap === 'peek' ? 'hidden xl:block' : ''}`}
         >
           {locationsState === 'loading' ? (
-            <ul aria-busy="true" className="space-y-1 p-2">
+            <ul aria-busy="true" className="space-y-2 p-1">
               {[0, 1, 2, 3].map((n) => (
-                <li key={n} className="h-14 animate-pulse rounded bg-gray-100" />
+              <li key={n} className="h-16 animate-pulse rounded-2xl bg-slate-100" />
               ))}
             </ul>
           ) : results.length === 0 ? (
@@ -449,26 +456,26 @@ export default function Home() {
               ) : null}
             </div>
           ) : (
-            <ul>
+            <ul className="space-y-1">
               {results.map((loc, i) => (
-                <li key={loc.id} data-loc-id={loc.id} className="border-b border-gray-100 last:border-0">
+              <li key={loc.id} data-loc-id={loc.id}>
                   <button
                     type="button"
                     onClick={() => select(loc.id)}
                     aria-current={loc.id === selected?.id}
-                    className={`flex min-h-[60px] w-full items-center gap-3 px-2 py-2.5 text-left transition active:bg-gray-100 ${
-                      loc.id === selected?.id ? 'bg-green-50 shadow-[inset_4px_0_0_0_#008236]' : 'hover:bg-gray-50'
+                    className={`flex min-h-[64px] w-full items-center gap-3 rounded-2xl border px-3 py-2.5 text-left transition active:bg-gray-100 ${
+                      loc.id === selected?.id ? 'border-emerald-200 bg-emerald-50 shadow-sm' : 'border-transparent hover:border-slate-100 hover:bg-slate-50'
                     }`}
                   >
-                    <span className="w-7 shrink-0 text-center text-xl font-black tabular-nums text-gray-300">{i + 1}</span>
+                    <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-xl text-sm font-bold tabular-nums ${loc.id === selected?.id ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-500'}`}>{i + 1}</span>
                     <span className="min-w-0 flex-1">
-                      <span className="block break-words text-sm font-bold tracking-tight">{loc.name}</span>
-                      <span className="flex items-center gap-1 truncate text-xs font-semibold text-gray-500">
+                      <span className="block break-words text-sm font-bold tracking-tight text-slate-900">{loc.name}</span>
+                      <span className="flex items-center gap-1 truncate text-xs font-medium text-slate-500">
                         <MapPin className="h-3 w-3 shrink-0" /> {loc.tag}
                       </span>
                     </span>
                     {loc.distance !== null && (
-                      <span className="shrink-0 rounded-full bg-gray-100 px-2.5 py-1 text-xs font-bold text-gray-700">
+                      <span className="shrink-0 rounded-full bg-white px-2.5 py-1 text-xs font-bold text-slate-700 shadow-sm">
                         {formatDistance(loc.distance)}
                       </span>
                     )}
@@ -480,10 +487,10 @@ export default function Home() {
         </div>
 
         {/* Selected destination action bar */}
-        <div className="max-h-[25%] shrink-0 overflow-y-auto overscroll-contain border-t border-gray-200 bg-white px-4 pb-3 pt-3 xl:max-h-[35%] xl:px-5">
+        <div className={`${snap === 'peek' ? 'max-h-none' : snap === 'full' ? 'max-h-[28%]' : 'max-h-[38%]'} shrink-0 overflow-y-auto overscroll-contain border-t border-gray-200 bg-white px-4 pb-3 pt-3 xl:max-h-[35%] xl:px-5`}>
           <div className="mb-2 min-w-0">
             <p className="truncate text-sm font-black uppercase tracking-tight">{selected?.name ?? 'Choose a destination'}</p>
-            <p className="flex flex-wrap items-center gap-x-3 text-xs font-semibold text-gray-500">
+            <p className={`flex flex-wrap items-center gap-x-3 text-xs font-semibold text-gray-500 ${snap === 'full' ? 'hidden xl:flex' : ''}`}>
               <span className="inline-flex items-center gap-1">
                 <Footprints className="h-3.5 w-3.5" />
                 {!selected

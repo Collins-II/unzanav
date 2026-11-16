@@ -29,13 +29,18 @@ export const GET = withDatabaseErrorHandling(async function GET(request: Request
   const search = new URL(request.url).searchParams;
   const before = search.get("before");
   const kind = search.get("kind");
+  const sessionId = search.get("sessionId");
   if (before && !isObjectId(before)) return NextResponse.json({ error: "Invalid activity cursor." }, { status: 400 });
+  if (sessionId !== null && (!isObjectId(sessionId) || kind !== "resource")) {
+    return NextResponse.json({ error: "Invalid session resource filter." }, { status: 400 });
+  }
   if (kind !== null && kind !== "session" && kind !== "poll" && kind !== "resource") {
     return NextResponse.json({ error: "Invalid activity filter." }, { status: 400 });
   }
   const activities = await CircleActivity.find({
     conversation: id,
     ...(kind ? { kind } : {}),
+    ...(sessionId ? { session: sessionId } : {}),
     ...(before ? { _id: { $lt: before } } : {}),
   }).sort({ _id: -1 }).limit(31).lean();
   const page = activities.slice(0, 30);
@@ -53,6 +58,7 @@ export const GET = withDatabaseErrorHandling(async function GET(request: Request
       createdAt: activity.createdAt.toISOString(),
       responses: activity.responses,
       ...(activity.document ? { document: activity.document } : {}),
+      ...(activity.session ? { sessionId: activity.session.toString() } : {}),
     })),
     nextCursor: activities.length > 30 ? page.at(-1)?._id.toString() : null,
   }, { headers: { "Cache-Control": "no-store" } });
@@ -65,6 +71,7 @@ export const POST = withDatabaseErrorHandling(async function POST(request: Reque
   let input: unknown;
   let document: CircleDocument | undefined;
   let documentData: Buffer | undefined;
+  let sessionId: unknown;
   if (request.headers.get("content-type")?.toLowerCase().startsWith("multipart/form-data")) {
     const upload = await readCircleUpload(request);
     if (!upload.data) return NextResponse.json({ error: upload.error }, { status: upload.status });
@@ -80,12 +87,21 @@ export const POST = withDatabaseErrorHandling(async function POST(request: Reque
     const contentError = validateCircleDocumentContents(file.name, documentData);
     if (contentError) return NextResponse.json({ error: contentError }, { status: 400 });
     document = metadata.data;
+    sessionId = form.get("sessionId");
     input = { kind: "resource", title: form.get("title"), description: form.get("description") };
   } else {
     input = await request.json();
+    if (input && typeof input === "object") sessionId = (input as Record<string, unknown>).sessionId;
   }
   const result = validateCircleDraft(input, Date.now(), document ? "document" : "link");
   if (!result.data) return NextResponse.json({ error: result.error }, { status: 400 });
+  if (sessionId != null) {
+    if (result.data.kind !== "resource" || !isObjectId(sessionId)) {
+      return NextResponse.json({ error: "Invalid study session." }, { status: 400 });
+    }
+    const session = await CircleActivity.findOne({ _id: sessionId, conversation: id, kind: "session" }).lean();
+    if (!session) return NextResponse.json({ error: "Study session not found in this circle." }, { status: 404 });
+  }
   const { startsAt, ...draft } = result.data;
   if (draft.kind === "session") {
     const roomPattern = escapeRegex(draft.location);
@@ -105,6 +121,7 @@ export const POST = withDatabaseErrorHandling(async function POST(request: Reque
     conversation: id,
     createdBy: access.userId,
     ...(document ? { document, documentData } : {}),
+    ...(sessionId ? { session: sessionId } : {}),
   });
   return NextResponse.json({ id: activity._id.toString() }, { status: 201 });
 }, "chat.circle.create", "Unable to share this activity right now.");

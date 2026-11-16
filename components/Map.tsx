@@ -168,6 +168,7 @@ export default function Map({
   profile = 'foot',
   campusId: controlledCampus,
   onCampusChange,
+  showCampusSelector = true,
 }: {
   destination?: CampusMapDestination;
   markers?: CampusMapRoom[];
@@ -179,6 +180,7 @@ export default function Map({
   profile?: RouteProfile;
   campusId?: CampusId;
   onCampusChange?: (campus: CampusId) => void;
+  showCampusSelector?: boolean;
 }) {
   const [route, setRoute] = useState<CampusRouteInfo | null>(null);
   const [campusSelection, setCampusSelection] = useState<{ campus: CampusId; ignoredDestinationId?: string }>({ campus: "main" });
@@ -247,13 +249,15 @@ export default function Map({
 
   return (
     <div className={`relative w-full overflow-hidden bg-gray-100 ${className}`}>
-      <label className="absolute left-3 top-24 z-[1000] rounded-lg bg-white p-2 text-sm text-gray-900 shadow xl:left-[470px]">
-        <span className="mr-2">UNZA campus</span>
-        <select aria-label="UNZA campus" value={campusId} onChange={(event) => {
-          setCampusSelection({ campus: event.target.value as CampusId, ignoredDestinationId: destination?.id });
-          onCampusChange?.(event.target.value as CampusId);
-        }}>{campuses.map((campus) => <option key={campus.id} value={campus.id}>{campus.name}</option>)}</select>
-      </label>
+      {showCampusSelector && (
+        <label className="absolute left-3 top-24 z-[1000] rounded-lg bg-white p-2 text-sm text-gray-900 shadow xl:left-[470px]">
+          <span className="mr-2">UNZA campus</span>
+          <select aria-label="UNZA campus" value={campusId} onChange={(event) => {
+            setCampusSelection({ campus: event.target.value as CampusId, ignoredDestinationId: destination?.id });
+            onCampusChange?.(event.target.value as CampusId);
+          }}>{campuses.map((campus) => <option key={campus.id} value={campus.id}>{campus.name}</option>)}</select>
+        </label>
+      )}
       {initialUserLocation && !activeUserLocation && showUserLocation && <p role="status" className="absolute bottom-3 left-3 z-[1000] max-w-[85%] rounded bg-white p-2 text-xs text-gray-900 shadow">Your location is outside this campus. Campus navigation starts when you are within its boundary.</p>}
       {destination && !destinationCampus && <p role="alert" className="absolute bottom-3 left-3 z-[1000] rounded bg-white p-2 text-xs text-red-700">This destination needs verified UNZA campus coordinates.</p>}
       {routeError && activeUserLocation && campusDestination && <p role="alert" className="absolute bottom-3 left-3 z-[1000] max-w-[85%] rounded bg-white p-2 text-xs text-red-700">{routeError}</p>}

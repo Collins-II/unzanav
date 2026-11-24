@@ -16,6 +16,30 @@ Required environment variables:
 The integration key is never exposed to browser code. Browser requests go through this
 app's internal API routes.
 
+For production, configure both deployment projects (for example, both Vercel projects):
+
+1. Set `ADMIN_APP_URL` on the student project to the deployed admin app's HTTPS
+   origin, not `localhost`.
+2. Set the same nonempty, high-entropy `STUDENT_APP_API_KEY` on both the student
+   and admin projects, in the environment used by each deployment. Keep it
+   server-only; do not use a `NEXT_PUBLIC_` prefix.
+3. Configure both apps to use the same MongoDB cluster **and database**. The
+   database must support transactions. The student app prefers `MONGODB_URI`
+   over `MONGODB_URL` when both are set.
+4. Redeploy both projects after changing their environment variables. Set each
+   app's `NEXTAUTH_URL` to its own production HTTPS origin and use distinct,
+   strong `NEXTAUTH_SECRET` values.
+
+Check `GET /api/programmes` on the student deployment after redeploying. A
+successful response contains `programmes`; staff must configure the real
+programme catalogue before registration can work. A 503 with **Student
+integration is not configured.** comes from the admin app and means its
+`STUDENT_APP_API_KEY` is absent or empty. **Central admin integration is not
+configured.** instead means the student app lacks a valid `ADMIN_APP_URL` or
+key. A 401 from the admin integration indicates mismatched keys; a 502 means the
+student server could not reach the configured admin URL. Do not share the keys
+when reporting or diagnosing errors.
+
 ## Development
 
 Use Node.js 20.9 or later.

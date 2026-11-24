@@ -79,6 +79,7 @@ export default function Home() {
   const [locations, setLocations] = useState<CampusLocation[]>([]);
   const [locationsState, setLocationsState] = useState<'loading' | 'ready' | 'error'>('loading');
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [customLocation, setCustomLocation] = useState<CampusLocation | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [category, setCategory] = useState('All');
   const [rooms, setRooms] = useState<RoomRecord[]>([]);
@@ -219,7 +220,7 @@ export default function Home() {
       document.removeEventListener('visibilitychange', onVisible);
     };
   }, [status, loadHomeData]);
-  const selected = campusLocations.find((l) => l.id === selectedId) ?? null;
+  const selected = campusLocations.find((l) => l.id === selectedId) ?? customLocation ?? null;
   const mapMarkers = useMemo(
     () => campusLocations.map(({ id, name, lat, lng, tag }) => ({ id, name, lat, lng, tag })),
     [campusLocations]
@@ -265,7 +266,31 @@ export default function Home() {
 
   const select = (id: string) => {
     setSelectedId(id);
+    setCustomLocation(null);
     setSnap((s) => (s === 'full' ? 'half' : s));
+  };
+
+  const handleMapClick = (lat: number, lng: number) => {
+    // Check if clicked location exists in system
+    const existingLocation = campusLocations.find((loc) => {
+      const distance = calculateDistance(loc.lat, loc.lng, lat, lng);
+      return distance < 50; // Within 50m is considered same location
+    });
+
+    if (existingLocation) {
+      select(existingLocation.id);
+    } else {
+      // Set custom location for temporal navigation
+      setCustomLocation({
+        id: `custom-${Date.now()}`,
+        name: 'Custom Location',
+        lat,
+        lng,
+        tag: 'Clicked on map',
+      });
+      setSelectedId(null);
+      setSnap((s) => (s === 'full' ? 'half' : s));
+    }
   };
 
   useEffect(() => {
@@ -278,14 +303,22 @@ export default function Home() {
     <main id="main-content" tabIndex={-1} className="fixed inset-0 overflow-hidden bg-emerald-50 text-gray-900">
       <CampusMap
         className="absolute inset-0 h-full"
-        destination={selected ?? undefined}
+        destination={selected ? {
+          id: selected.id,
+          name: selected.name,
+          lat: selected.lat,
+          lng: selected.lng,
+          tag: selected.tag,
+        } : undefined}
         markers={mapMarkers}
         onSelect={select}
         onRoute={setRouteInfo}
         userLocation={userLocation ?? undefined}
         campusId={campusId}
         showCampusSelector={false}
-        onCampusChange={(campus) => { setCampusChoice(campus); setSelectedId(null); setCategory('All'); setSearchQuery(''); setRouteInfo(null); }}
+        hideUnselectedMarkers={true}
+        onMapClick={handleMapClick}
+        onCampusChange={(campus) => { setCampusChoice(campus); setSelectedId(null); setCustomLocation(null); setCategory('All'); setSearchQuery(''); setRouteInfo(null); }}
       />
 
       {/* Top bar */}
@@ -489,12 +522,17 @@ export default function Home() {
         {/* Selected destination action bar */}
         <div className={`${snap === 'peek' ? 'max-h-none' : snap === 'full' ? 'max-h-[28%]' : 'max-h-[38%]'} shrink-0 overflow-y-auto overscroll-contain border-t border-gray-200 bg-white px-4 pb-3 pt-3 xl:max-h-[35%] xl:px-5`}>
           <div className="mb-2 min-w-0">
-            <p className="truncate text-sm font-black uppercase tracking-tight">{selected?.name ?? 'Choose a destination'}</p>
+            <p className="truncate text-sm font-black uppercase tracking-tight">
+              {selected?.name ?? 'Choose a destination'}
+              {customLocation?.id === selected?.id && <span className="ml-2 text-xs font-normal text-amber-600">(Map pin)</span>}
+            </p>
             <p className={`flex flex-wrap items-center gap-x-3 text-xs font-semibold text-gray-500 ${snap === 'full' ? 'hidden xl:flex' : ''}`}>
               <span className="inline-flex items-center gap-1">
                 <Footprints className="h-3.5 w-3.5" />
                 {!selected
-                  ? 'Tap a place on the map or list'
+                  ? customLocation
+                    ? 'You pinned a location on the map'
+                    : 'Tap a place on the map or list'
                   : routeInfo
                     ? `${routeInfo.source === 'straight' ? '≈ ' : ''}${formatDistance(routeInfo.distance)} · ~${walkMinutes(routeInfo.duration)} min walk${routeInfo.source === 'straight' ? ' (approx.)' : ''}`
                     : userLocation
@@ -524,12 +562,26 @@ export default function Home() {
               )}
             </>
           ) : selected ? (
-            <Link
-              href={`/navigation?id=${encodeURIComponent(selected.id)}`}
-              className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 text-sm font-bold text-white transition hover:bg-emerald-700 active:scale-[0.98]"
-            >
-              <Navigation className="h-5 w-5" /> Start navigation
-            </Link>
+            <>
+              <Link
+                href={`/navigation?id=${encodeURIComponent(selected.id)}${customLocation?.id === selected?.id ? `&lat=${selected.lat}&lng=${selected.lng}` : ''}`}
+                className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 text-sm font-bold text-white transition hover:bg-emerald-700 active:scale-[0.98]"
+              >
+                <Navigation className="h-5 w-5" /> Start navigation
+              </Link>
+              {customLocation?.id === selected?.id && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCustomLocation(null);
+                    setSelectedId(null);
+                  }}
+                  className="mt-2 h-10 w-full rounded-lg border border-gray-300 text-xs font-semibold text-gray-700 hover:bg-gray-50"
+                >
+                  Clear map pin
+                </button>
+              )}
+            </>
           ) : (
             <div className="flex h-12 w-full items-center justify-center rounded bg-gray-100 text-xs font-black uppercase tracking-widest text-gray-500">
               Pick a destination

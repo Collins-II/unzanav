@@ -84,20 +84,39 @@ async function fetchRoute(
 const REROUTE_DISTANCE_M = 40;
 const REROUTE_MIN_INTERVAL_MS = 10000;
 const TILE_URL = process.env.NEXT_PUBLIC_TILE_URL || 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
-function MapFocus({
+function MapInteraction({
   destination,
   hasStart,
   route,
   markers,
   campusId,
+  hideUnselectedMarkers,
+  onMapClick,
 }: {
   destination: CampusMapDestination | undefined;
   hasStart: boolean;
   route: CampusRouteInfo | null;
   markers: CampusMapRoom[];
   campusId: CampusId;
+  hideUnselectedMarkers: boolean;
+  onMapClick?: (lat: number, lng: number) => void;
 }) {
   const map = useMap();
+  
+  useEffect(() => {
+    const handleMapClick = (e: any) => {
+      onMapClick?.(e.latlng.lat, e.latlng.lng);
+    };
+    
+    if (onMapClick) {
+      map.on('click', handleMapClick);
+      return () => {
+        map.off('click', handleMapClick);
+      };
+    }
+    return undefined;
+  }, [map, onMapClick]);
+
   const campus = campuses.find((campus) => campus.id === campusId)!;
 
   useEffect(() => {
@@ -117,6 +136,7 @@ function MapFocus({
 
   return null;
 }
+
 
 function LocateButton({ location }: { location: UserLocationMarkerType | null }) {
   const map = useMap();
@@ -169,6 +189,8 @@ export default function Map({
   campusId: controlledCampus,
   onCampusChange,
   showCampusSelector = true,
+  hideUnselectedMarkers = false,
+  onMapClick,
 }: {
   destination?: CampusMapDestination;
   markers?: CampusMapRoom[];
@@ -181,6 +203,8 @@ export default function Map({
   campusId?: CampusId;
   onCampusChange?: (campus: CampusId) => void;
   showCampusSelector?: boolean;
+  hideUnselectedMarkers?: boolean;
+  onMapClick?: (lat: number, lng: number) => void;
 }) {
   const [route, setRoute] = useState<CampusRouteInfo | null>(null);
   const [campusSelection, setCampusSelection] = useState<{ campus: CampusId; ignoredDestinationId?: string }>({ campus: "main" });
@@ -284,7 +308,7 @@ export default function Map({
           [[-90, -180], [-90, 180], [90, 180], [90, -180]],
           campus.polygon.map(([longitude, latitude]): [number, number] => [latitude, longitude]),
         ]} pathOptions={{ stroke: false, fillColor: '#f1f5f9', fillOpacity: 0.92 }} interactive={false} />
-        <MapFocus destination={campusDestination} hasStart={hasStart} route={routePoints.length ? route : null} markers={campusMarkers} campusId={campusId} />
+        <MapInteraction destination={campusDestination} hasStart={hasStart} route={routePoints.length ? route : null} markers={campusMarkers} campusId={campusId} hideUnselectedMarkers={hideUnselectedMarkers} onMapClick={onMapClick} />
         <LocateButton location={activeUserLocation} />
 
         {routePoints.length > 1 && (
@@ -304,26 +328,49 @@ export default function Map({
         {activeUserLocation && <UserLocationMarker location={activeUserLocation} />}
 
         {campusMarkers.map((room) => (
-          <CircleMarker
-            key={room.id}
-            center={[room.lat, room.lng]}
-            eventHandlers={{ click: () => onSelect?.(room.id) }}
-            radius={room.id === destination?.id ? 16 : 12}
-            pathOptions={{
-              color: room.available === false ? '#f59e0b' : '#008236',
-              fillColor: room.available === false ? '#f59e0b' : '#86efac',
-              fillOpacity: room.id === destination?.id ? 0.95 : 0.8,
-              weight: room.id === destination?.id ? 3 : 2,
-            }}
-          >
-            <Popup>
-              <div className="space-y-1 text-sm text-gray-900">
-                <p className="font-semibold">{room.name}</p>
-                <p className="text-gray-600">{room.available === false ? 'Currently unavailable' : 'Open for use; check booking availability'}</p>
-                {room.tag ? <p className="font-medium text-gray-700">{room.tag}</p> : null}
-              </div>
-            </Popup>
-          </CircleMarker>
+          destination?.id === room.id ? (
+            <CircleMarker
+              key={room.id}
+              center={[room.lat, room.lng]}
+              eventHandlers={{ click: () => onSelect?.(room.id) }}
+              radius={16}
+              pathOptions={{
+                color: room.available === false ? '#f59e0b' : '#008236',
+                fillColor: room.available === false ? '#f59e0b' : '#86efac',
+                fillOpacity: 0.95,
+                weight: 3,
+              }}
+            >
+              <Popup>
+                <div className="space-y-1 text-sm text-gray-900">
+                  <p className="font-semibold">{room.name}</p>
+                  <p className="text-gray-600">{room.available === false ? 'Currently unavailable' : 'Open for use; check booking availability'}</p>
+                  {room.tag ? <p className="font-medium text-gray-700">{room.tag}</p> : null}
+                </div>
+              </Popup>
+            </CircleMarker>
+          ) : !hideUnselectedMarkers ? (
+            <CircleMarker
+              key={room.id}
+              center={[room.lat, room.lng]}
+              eventHandlers={{ click: () => onSelect?.(room.id) }}
+              radius={12}
+              pathOptions={{
+                color: room.available === false ? '#f59e0b' : '#008236',
+                fillColor: room.available === false ? '#f59e0b' : '#86efac',
+                fillOpacity: 0.8,
+                weight: 2,
+              }}
+            >
+              <Popup>
+                <div className="space-y-1 text-sm text-gray-900">
+                  <p className="font-semibold">{room.name}</p>
+                  <p className="text-gray-600">{room.available === false ? 'Currently unavailable' : 'Open for use; check booking availability'}</p>
+                  {room.tag ? <p className="font-medium text-gray-700">{room.tag}</p> : null}
+                </div>
+              </Popup>
+            </CircleMarker>
+          ) : null
         ))}
       </MapContainer>
     </div>

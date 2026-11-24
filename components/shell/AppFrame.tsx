@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { signOut, useSession } from "next-auth/react";
 import { useEffect, useState, type ReactNode } from "react";
 import {
-  ArrowUpRight,
+ // ArrowUpRight,
   Bell,
   CalendarClock,
   CalendarDays,
@@ -103,11 +103,11 @@ function StudentWorkspace({ children, pathname }: { children: ReactNode; pathnam
       {mobileOpen && <button type="button" className="sidebar-scrim" aria-label="Close navigation" onClick={() => setMobileOpen(false)} />}
       <aside className={`app-sidebar ${mobileOpen ? "is-open" : ""}`} aria-label="Student workspace">
         <Link href="/dashboard" className="app-brand" aria-label="UNZA Navigator dashboard"><BrandLogo /></Link>
-        <a href="https://www.unza.zm" target="_blank" rel="noopener noreferrer" className="workspace-switch">
+        {/*<a href="https://www.unza.zm" target="_blank" rel="noopener noreferrer" className="workspace-switch">
           <span className="workspace-avatar">U</span>
           <span><strong>University of Zambia</strong><small><i /> Student portal</small></span>
           <ArrowUpRight size={15} />
-        </a>
+        </a>*/}
         <div className="nav-label">STUDENT WORKSPACE</div>
         <nav aria-label="Main navigation">
           {navigation.map(({ label, href, icon: Icon }) => {

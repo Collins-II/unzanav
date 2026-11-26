@@ -90,7 +90,7 @@ function MapInteraction({
   route,
   markers,
   campusId,
-  hideUnselectedMarkers,
+ // hideUnselectedMarkers,
   onMapClick,
 }: {
   destination: CampusMapDestination | undefined;

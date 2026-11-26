@@ -16,6 +16,7 @@ import {
   Locate,
   Zap,
   Search,
+  X,
 } from 'lucide-react';
 import { calculateDistance } from '@/lib/useGeolocation';
 import { useUserLocation } from '@/lib/LocationContext';
@@ -424,27 +425,62 @@ function NavigationContent() {
                 </span>
               </div>
 
-              <label className="mb-4 flex items-center gap-2 rounded-lg border border-slate-200 px-3">
-                <Search size={16} className="text-slate-400" /><span className="sr-only">Search destinations</span>
-                <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search destinations..." className="min-h-11 w-full min-w-0 text-sm outline-none" />
-              </label>
+<div className="group relative mb-4 flex items-center gap-2.5 rounded-xl border border-slate-200/90 border-b-[2px] border-b-slate-300 bg-slate-50/80 px-3.5 shadow-[0_1px_2px_rgba(15,23,42,0.04)] transition-all duration-200 focus-within:border-emerald-500/50 focus-within:border-b-[2px] focus-within:border-b-emerald-600 focus-within:bg-white focus-within:shadow-[0_6px_20px_-6px_rgba(5,150,105,0.25)]">
+  <label
+    htmlFor="campus-places-search"
+    className="flex h-7 w-7 shrink-0 cursor-text items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-700 transition-colors duration-200 group-focus-within:bg-emerald-600 group-focus-within:text-white"
+  >
+    <Search className="h-4 w-4" aria-hidden="true" />
+    <span className="sr-only">Search destinations</span>
+  </label>
+
+  <input
+    id="campus-places-search"
+    type="text"
+    inputMode="search"
+    enterKeyHint="search"
+    autoComplete="off"
+    value={query}
+    onChange={(event) => setQuery(event.target.value)}
+    onKeyDown={(event) => {
+      if (event.key === 'Escape' && query) {
+        event.preventDefault();
+        setQuery('');
+      }
+    }}
+    placeholder="Search lecture halls, labs, offices..."
+    className="min-h-11 w-full min-w-0 border-0 bg-transparent p-0 text-sm font-medium text-slate-900 placeholder:font-normal placeholder:text-slate-400 outline-none ring-0 focus:border-0 focus:outline-none focus:ring-0"
+  />
+
+  {query && (
+    <button
+      type="button"
+      onMouseDown={(event) => event.preventDefault()}
+      onClick={() => setQuery('')}
+      aria-label="Clear search"
+      className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-slate-200/80 text-slate-600 transition hover:bg-slate-300 hover:text-slate-900"
+    >
+      <X className="h-3.5 w-3.5" aria-hidden="true" />
+    </button>
+  )}
+</div>
               {stopsState === 'error' && <p role="alert" className="mb-3 text-sm text-red-700">Campus places could not be loaded. <Link href="/" className="underline">Return to the directory to retry.</Link></p>}
               {stopsState === 'ready' && !visibleStops.length && <p className="mb-3 text-sm text-slate-500">{stops.length ? 'No other matching destinations.' : 'No mapped locations have been published yet.'}</p>}
-              <div className="flex flex-wrap gap-1.5 sm:gap-2 md:gap-2.5">
+              <div className="max-h-[200px] overflow-y-scroll flex flex-wrap gap-1.5 sm:gap-2 md:gap-2.5">
                 {visibleStops.map((stop) => (
                   <Link
                     key={stop.id}
                     href={`/navigation?id=${encodeURIComponent(stop.id)}`}
                     className="group inline-flex min-w-0 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 shadow-sm transition-all hover:border-emerald-300 hover:bg-emerald-50 hover:shadow-md"
                   >
-                    <div className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-emerald-50 text-emerald-700 transition-transform group-hover:scale-110">
+                    <div className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-emerald-50 text-emerald-700 transition-transform group-hover:scale-110">
                       <MapPin className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
                     </div>
                     <div className="flex flex-col gap-0 min-w-0">
-                      <div className="truncate text-xs font-semibold leading-tight text-slate-900">
+                      <div className="truncate text-[11px] font-semibold leading-tight text-slate-900">
                         {stop.name}
                       </div>
-                      <div className="truncate text-[11px] text-slate-500">
+                      <div className="truncate text-[9px] text-slate-500">
                         {stop.eta} • {stop.distance}
                       </div>
                     </div>
